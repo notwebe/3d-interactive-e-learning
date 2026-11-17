@@ -1200,6 +1200,11 @@
     playerNightFillLight.position.set(0, 3.2, 0);
     scene.add(playerNightFillLight);
 
+    // Real-Time WIB Window Sunlight / Moonlight PointLight
+    const windowSunPointLight = new THREE.PointLight(0xffb84d, 0.9, 11.5, 1.6);
+    windowSunPointLight.position.set(0, 2.8, -3.2);
+    scene.add(windowSunPointLight);
+
     // Helper for Low-Poly Flat-Shaded Materials
     function makeMat(color, opts = {}) {
       return new THREE.MeshStandardMaterial({
@@ -1229,8 +1234,15 @@
     let clockHourHandPivot = null;
     let clockMinuteHandPivot = null;
     let clockSecondHandPivot = null;
-    // Night-Mode Glow Mesh References & 3D Light Switch Parts
+    // Night-Mode Glow Mesh References, 3D Window Sunbeams & 3D Light Switch Parts
     let windowGlassMesh = null;
+    let windowCelestialOrbMesh = null;
+    let windowStarsGroup = null;
+    const windowStarMeshes = [];
+    let windowSunbeamPivot = null;
+    const windowSunbeamMeshes = [];
+    let windowFloorPatchGroup = null;
+    const windowFloorPatchMeshes = [];
     let monitorScreenMesh = null;
     let deskLampShadeMesh = null;
     let whiteboardSurfaceMesh = null;
@@ -1355,23 +1367,179 @@
       trimLeft.position.set(-5.74, 0.45, 0);
       roomGroup.add(trimLeft);
 
-      // Warm Glowing Window on North Wall (Center)
+      // ---------------------------------------------------------------------
+      // 3D Jendela Kamar Estetik & Sinar Matahari Real-Time WIB (North/Right Wall)
+      // ---------------------------------------------------------------------
       const winFrame = new THREE.Group();
       winFrame.position.set(0, 3.1, -5.52);
+
+      // Sky Glass Pane (color & emissive dynamically synced with real-time WIB)
       const glass = new THREE.Mesh(
-        new THREE.BoxGeometry(2.6, 2.1, 0.08),
+        new THREE.BoxGeometry(2.68, 2.16, 0.06),
         makeMat(0xffe4a0, { emissive: 0xffb84d, emissiveIntensity: 0.75, roughness: 0.2 })
       );
       windowGlassMesh = glass;
       winFrame.add(glass);
 
+      // Celestial Orb (Sun / Moon silhouette inside the window sky)
+      windowCelestialOrbMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.27, 0.27, 0.02, 20),
+        makeMat(0xfde047, { emissive: 0xfde047, emissiveIntensity: 1.1, roughness: 0.15 })
+      );
+      windowCelestialOrbMesh.rotation.x = Math.PI / 2;
+      windowCelestialOrbMesh.position.set(0.55, 0.25, 0.038);
+      winFrame.add(windowCelestialOrbMesh);
+
+      // Twinkling Starry Night Sky Dots (visible during Malam 18:00 - 05:59 WIB)
+      windowStarsGroup = new THREE.Group();
+      windowStarMeshes.length = 0;
+      const starCoords = [
+        [-1.02, 0.78], [-0.68, 0.45], [-0.32, 0.82], [0.22, 0.76], [0.88, 0.80],
+        [-0.95, 0.18], [-0.42, -0.18], [0.18, 0.22], [0.75, -0.15], [1.05, 0.32],
+        [-0.82, -0.62], [-0.25, -0.72], [0.38, -0.58], [0.92, -0.68]
+      ];
+      starCoords.forEach(([sx, sy], idx) => {
+        const sz = idx % 3 === 0 ? 0.05 : 0.036;
+        const star = new THREE.Mesh(
+          new THREE.BoxGeometry(sz, sz, 0.015),
+          makeMat(0xf8fafc, { emissive: 0xe0f2fe, emissiveIntensity: 0.95 })
+        );
+        star.position.set(sx, sy, 0.042);
+        star.rotation.z = Math.PI / 4;
+        windowStarMeshes.push(star);
+        windowStarsGroup.add(star);
+      });
+      winFrame.add(windowStarsGroup);
+
+      // Wooden Outer Window Frame, Mullions & Wide Sill
       const frameMat = makeMat(0x4a2e1b);
-      const barH = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 0.16), frameMat);
-      const barV = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.2, 0.16), frameMat);
-      const sill = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.16, 0.35), frameMat);
-      sill.position.set(0, -1.1, 0.1);
-      winFrame.add(barH, barV, sill);
+      const trimAccentMat = makeMat(0x6b4226);
+      const topHeader = enableShadow(new THREE.Mesh(new THREE.BoxGeometry(3.16, 0.20, 0.24), frameMat));
+      topHeader.position.set(0, 1.12, 0.05);
+      const leftJamb = enableShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.28, 0.20), frameMat));
+      leftJamb.position.set(-1.36, 0, 0.04);
+      const rightJamb = enableShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.28, 0.20), frameMat));
+      rightJamb.position.set(1.36, 0, 0.04);
+
+      const barH = enableShadow(new THREE.Mesh(new THREE.BoxGeometry(2.76, 0.11, 0.16), frameMat));
+      barH.position.set(0, 0.02, 0.05);
+      const barV = enableShadow(new THREE.Mesh(new THREE.BoxGeometry(0.11, 2.2, 0.16), frameMat));
+      barV.position.set(0, 0, 0.05);
+
+      const sill = enableShadow(new THREE.Mesh(new THREE.BoxGeometry(3.28, 0.16, 0.42), trimAccentMat));
+      sill.position.set(0, -1.12, 0.12);
+
+      // Brass Curtain Rod & Cozy Gathered Side Curtains
+      const rodMat = makeMat(0xd97706, { metalness: 0.45, roughness: 0.35 });
+      const curtainRod = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 3.55, 10), rodMat);
+      curtainRod.rotation.z = Math.PI / 2;
+      curtainRod.position.set(0, 1.28, 0.14);
+
+      const curtainMat = makeMat(0xf5ebe0, { roughness: 0.85 });
+      const tieMat = makeMat(0xd97706);
+      [-1.48, 1.48].forEach((cx) => {
+        const drape = enableShadow(new THREE.Mesh(new THREE.BoxGeometry(0.38, 2.42, 0.16), curtainMat));
+        drape.position.set(cx, 0.04, 0.14);
+        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.10, 0.18), tieMat);
+        tie.position.set(cx, -0.35, 0.14);
+        winFrame.add(drape, tie);
+      });
+
+      // Mini Succulent Plant on the Windowsill
+      const miniPot = enableShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.09, 0.18, 8), makeMat(0xc2593f)));
+      miniPot.position.set(-0.92, -0.95, 0.20);
+      const miniPlant = enableShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.11, 0), makeMat(0x10b981)));
+      miniPlant.position.set(-0.92, -0.82, 0.20);
+
+      winFrame.add(topHeader, leftJamb, rightJamb, barH, barV, sill, curtainRod, miniPot, miniPlant);
+
+      // Register 3D Window Group for Hover Glow & Floating Label ('room_window')
+      registerHoverableGroup(winFrame, 'room_window', 0xfbbf24);
       roomGroup.add(winFrame);
+
+      // ---------------------------------------------------------------------
+      // Volumetric Sunbeams (God Rays) & Floor Light Patch (Real-Time WIB)
+      // ---------------------------------------------------------------------
+      windowSunbeamPivot = new THREE.Group();
+      windowSunbeamMeshes.length = 0;
+
+      // Helper to build a 4-corner volumetric ray sheet connecting window pane to floor patch
+      const rayDefs = [
+        // 4 window pane beams (top-left, top-right, bottom-left, bottom-right panes)
+        { tx1: -1.24, ty1: 4.08, tx2: -0.08, ty2: 4.08, bx1: -1.35, bz1: -0.95, bx2: -0.08, bz2: -0.95, op: 1.0 },
+        { tx1: 0.08, ty1: 4.08, tx2: 1.24, ty2: 4.08, bx1: 0.08, bz1: -0.95, bx2: 1.35, bz2: -0.95, op: 1.0 },
+        { tx1: -1.24, ty1: 3.05, tx2: -0.08, ty2: 3.05, bx1: -1.35, bz1: 0.05, bx2: -0.08, bz2: 0.05, op: 0.85 },
+        { tx1: 0.08, ty1: 3.05, tx2: 1.24, ty2: 3.05, bx1: 0.08, bz1: 0.05, bx2: 1.35, bz2: 0.05, op: 0.85 },
+        // 2 diagonal volumetric side curtains for 3D depth from isometric camera
+        { tx1: -1.26, ty1: 4.10, tx2: -1.26, ty2: 2.08, bx1: -1.38, bz1: -0.95, bx2: -1.38, bz2: 0.95, op: 0.65 },
+        { tx1: 0.0, ty1: 4.10, tx2: 0.0, ty2: 2.08, bx1: 0.0, bz1: -0.95, bx2: 0.0, bz2: 0.95, op: 0.55 },
+        { tx1: 1.26, ty1: 4.10, tx2: 1.26, ty2: 2.08, bx1: 1.38, bz1: -0.95, bx2: 1.38, bz2: 0.95, op: 0.65 }
+      ];
+
+      rayDefs.forEach((def) => {
+        const geom = new THREE.BufferGeometry();
+        const positions = new Float32Array(18); // 2 triangles (6 vertices)
+        geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0xfde047,
+          transparent: true,
+          opacity: 0.14 * def.op,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.userData.rayDef = def;
+        windowSunbeamMeshes.push(mesh);
+        windowSunbeamPivot.add(mesh);
+      });
+      roomGroup.add(windowSunbeamPivot);
+
+      // Projected Floor Light Patch (4 window panes + soft outer glow halo on the floor)
+      windowFloorPatchGroup = new THREE.Group();
+      windowFloorPatchGroup.position.set(0, 0.065, -2.5);
+      windowFloorPatchMeshes.length = 0;
+
+      const outerHaloGeo = new THREE.PlaneGeometry(3.3, 2.35);
+      outerHaloGeo.rotateX(-Math.PI / 2);
+      const outerHaloMat = new THREE.MeshBasicMaterial({
+        color: 0xfde047,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      const outerHaloMesh = new THREE.Mesh(outerHaloGeo, outerHaloMat);
+      outerHaloMesh.userData.opacityFactor = 0.48;
+      windowFloorPatchMeshes.push(outerHaloMesh);
+      windowFloorPatchGroup.add(outerHaloMesh);
+
+      // 4 Pane Light Rectangles on Floor (matching the 2x2 window mullions)
+      const paneOffsets = [
+        [-0.68, -0.48],
+        [0.68, -0.48],
+        [-0.68, 0.48],
+        [0.68, 0.48]
+      ];
+      paneOffsets.forEach(([px, pz]) => {
+        const pGeo = new THREE.PlaneGeometry(1.20, 0.82);
+        pGeo.rotateX(-Math.PI / 2);
+        const pMat = new THREE.MeshBasicMaterial({
+          color: 0xfef08a,
+          transparent: true,
+          opacity: 0.24,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+        const pMesh = new THREE.Mesh(pGeo, pMat);
+        pMesh.position.set(px, 0.002, pz);
+        pMesh.userData.opacityFactor = 1.0;
+        windowFloorPatchMeshes.push(pMesh);
+        windowFloorPatchGroup.add(pMesh);
+      });
+      roomGroup.add(windowFloorPatchGroup);
 
       // Center Cozy Circular/Rounded Rug
       const rugGroup = new THREE.Group();
@@ -1845,6 +2013,19 @@
         </div>
       `;
       labelsContainer.appendChild(switchLabel);
+
+      // Floating Label above the 3D Room Window (shown on hover, synced with Real-Time WIB)
+      const windowLabel = document.createElement('div');
+      windowLabel.id = 'room-window-label';
+      windowLabel.className = 'world-label pointer-events-none px-3.5 py-1.5 rounded-2xl border border-amber-300/60 bg-[#1e1712]/90 backdrop-blur-md shadow-xl flex items-center gap-2.5 text-amber-100';
+      windowLabel.innerHTML = `
+        <span id="room-window-label-icon" class="text-base">🌇</span>
+        <div class="leading-tight">
+          <div id="room-window-label-title" class="text-xs font-extrabold tracking-tight whitespace-nowrap">Jendela Kamar: Sore / Golden Hour - --:-- WIB</div>
+          <div id="room-window-label-subtitle" class="text-[10px] opacity-80 whitespace-nowrap">Sinar Matahari Real-Time WIB (Asia/Jakarta)</div>
+        </div>
+      `;
+      labelsContainer.appendChild(windowLabel);
     }
 
     // -------------------------------------------------------------------------
@@ -2320,14 +2501,242 @@
         }
       });
 
-      // Update Live 3D Wall Clock Hands & Digital WIB Label (Asia/Jakarta, UTC+7)
-      updateLiveWIBWallClock();
+      // Update Live 3D Wall Clock Hands, Real-Time WIB Window Sunbeams & Digital WIB Label
+      updateLiveWIBWallClock(elapsedTime);
 
       // Update hover-only floating label above the 3D Light Switch
       updateLightSwitchLabel();
     }
 
-    function updateLiveWIBWallClock() {
+    // Compute Real-Time WIB Window Sky, Sunbeam Angle & Floor Light Patch Parameters
+    function getWIBWindowAtmosphere(hours, minutes, seconds) {
+      const hourDecimal = hours + minutes / 60 + seconds / 3600;
+
+      // 1) PAGI (06:00 - 10:59 WIB): Warm yellow morning sun, slanting morning angle
+      if (hours >= 6 && hours <= 10) {
+        const p = (hourDecimal - 6) / 5; // 0 -> 1 across 06:00..11:00
+        return {
+          phaseName: 'Pagi',
+          icon: '🌅',
+          subtitle: 'Sinar Kuning Hangat • Sudut Miring Pagi',
+          skyColorHex: 0x93c5fd,
+          skyEmissiveHex: 0xfde047,
+          skyEmissiveIntensity: 0.68,
+          orbColorHex: 0xfef08a,
+          orbX: -0.72 + p * 0.52,
+          orbY: 0.12 + p * 0.40,
+          starsVisible: false,
+          beamColorHex: 0xfde047,
+          baseBeamOpacity: 0.135,
+          basePatchOpacity: 0.25,
+          patchX: -0.95 + p * 0.65,
+          patchZ: -2.20 - p * 0.75,
+          patchScaleX: 1.10,
+          patchScaleZ: 1.32 - p * 0.25,
+          patchRotY: -0.18 + p * 0.12,
+          lightIntensity: 0.90
+        };
+      }
+
+      // 2) SIANG (11:00 - 14:59 WIB): Bright white-yellow sun, steeper overhead angle
+      if (hours >= 11 && hours <= 14) {
+        const p = (hourDecimal - 11) / 4; // 0 -> 1 across 11:00..15:00
+        return {
+          phaseName: 'Siang',
+          icon: '☀️',
+          subtitle: 'Sinar Putih-Kuning Cerah • Sudut Agak Tegak',
+          skyColorHex: 0xe0f2fe,
+          skyEmissiveHex: 0xfef9c3,
+          skyEmissiveIntensity: 0.84,
+          orbColorHex: 0xffffff,
+          orbX: -0.18 + p * 0.42,
+          orbY: 0.56 - Math.abs(p - 0.5) * 0.10,
+          starsVisible: false,
+          beamColorHex: 0xfef9c3,
+          baseBeamOpacity: 0.165,
+          basePatchOpacity: 0.30,
+          patchX: -0.25 + p * 0.55,
+          patchZ: -3.25 + p * 0.45,
+          patchScaleX: 1.02,
+          patchScaleZ: 0.88 + p * 0.18,
+          patchRotY: -0.05 + p * 0.12,
+          lightIntensity: 1.10
+        };
+      }
+
+      // 3) SORE / GOLDEN HOUR (15:00 - 17:59 WIB): Warm golden-orange sun, long stretched floor beam
+      if (hours >= 15 && hours <= 17) {
+        const p = (hourDecimal - 15) / 3; // 0 -> 1 across 15:00..18:00
+        return {
+          phaseName: 'Sore / Golden Hour',
+          icon: '🌇',
+          subtitle: 'Sinar Jingga Keemasan Hangat • Memanjang di Lantai',
+          skyColorHex: 0xfdba74,
+          skyEmissiveHex: 0xf97316,
+          skyEmissiveIntensity: 0.90,
+          orbColorHex: 0xfb923c,
+          orbX: 0.32 + p * 0.52,
+          orbY: 0.42 - p * 0.52,
+          starsVisible: false,
+          beamColorHex: 0xfb923c,
+          baseBeamOpacity: 0.195,
+          basePatchOpacity: 0.35,
+          patchX: 0.48 + p * 0.65,
+          patchZ: -1.65 + p * 0.60,
+          patchScaleX: 1.16,
+          patchScaleZ: 1.52 + p * 0.28,
+          patchRotY: 0.16 + p * 0.10,
+          lightIntensity: 1.20
+        };
+      }
+
+      // 4) MALAM (18:00 - 05:59 WIB): Dark starry window glass with calm dim blue moonbeam
+      return {
+        phaseName: 'Malam',
+        icon: '🌌',
+        subtitle: 'Kaca Gelap Berbintang • Sinar Bulan Biru Tenang',
+        skyColorHex: 0x0f172a,
+        skyEmissiveHex: 0x1e3a8a,
+        skyEmissiveIntensity: 0.46,
+        orbColorHex: 0xe0f2fe,
+        orbX: 0.44,
+        orbY: 0.45,
+        starsVisible: true,
+        beamColorHex: 0x60a5fa,
+        baseBeamOpacity: 0.085,
+        basePatchOpacity: 0.15,
+        patchX: 0.28,
+        patchZ: -2.55,
+        patchScaleX: 1.04,
+        patchScaleZ: 1.15,
+        patchRotY: 0.09,
+        lightIntensity: 0.55
+      };
+    }
+
+    function updateRealTimeWIBWindow(wibDate, elapsedTime = 0) {
+      const hours = wibDate.getUTCHours();
+      const minutes = wibDate.getUTCMinutes();
+      const seconds = wibDate.getUTCSeconds();
+      const pad = (n) => String(n).padStart(2, '0');
+      const shortTime = `${pad(hours)}:${pad(minutes)} WIB`;
+
+      const atm = getWIBWindowAtmosphere(hours, minutes, seconds);
+
+      // Blend factor with Wall Light Switch (when room lights are OFF, window beams stand out more vividly)
+      const roomDarkContrast = lerpNum(1.32, 1.0, lightBlend);
+      const subtleShimmer = 1 + Math.sin(elapsedTime * 1.8) * 0.04;
+
+      // 1) Update Window Sky Glass & Sun/Moon Orb (Hover-Glow safe)
+      if (windowGlassMesh && windowGlassMesh.material) {
+        if (hoveredObjectId !== 'room_window') {
+          windowGlassMesh.material.color.setHex(atm.skyColorHex);
+        }
+        _tmpGlowColor.setHex(atm.skyEmissiveHex);
+        applyNightAwareGlow(windowGlassMesh, _tmpGlowColor, atm.skyEmissiveIntensity * roomDarkContrast);
+      }
+
+      if (windowCelestialOrbMesh && windowCelestialOrbMesh.material) {
+        windowCelestialOrbMesh.position.x = atm.orbX;
+        windowCelestialOrbMesh.position.y = atm.orbY;
+        if (hoveredObjectId !== 'room_window') {
+          windowCelestialOrbMesh.material.color.setHex(atm.orbColorHex);
+        }
+        _tmpGlowColor.setHex(atm.orbColorHex);
+        applyNightAwareGlow(windowCelestialOrbMesh, _tmpGlowColor, 1.15);
+      }
+
+      // 2) Twinkling Stars on Window Glass during Malam (18:00 - 05:59 WIB)
+      if (windowStarsGroup) {
+        windowStarsGroup.visible = atm.starsVisible;
+        if (atm.starsVisible) {
+          windowStarMeshes.forEach((star, idx) => {
+            const twinkle = 0.55 + 0.45 * Math.sin(elapsedTime * 3.2 + idx * 1.7);
+            _tmpGlowColor.setHex(0xe0f2fe);
+            applyNightAwareGlow(star, _tmpGlowColor, twinkle * 1.25);
+          });
+        }
+      }
+
+      // 3) Update Floor Light Patch Position, Stretch, Angle & Glow
+      if (windowFloorPatchGroup) {
+        windowFloorPatchGroup.position.set(atm.patchX, 0.065, atm.patchZ);
+        windowFloorPatchGroup.scale.set(atm.patchScaleX, 1, atm.patchScaleZ);
+        windowFloorPatchGroup.rotation.y = atm.patchRotY;
+
+        windowFloorPatchMeshes.forEach((patchMesh) => {
+          patchMesh.material.color.setHex(atm.beamColorHex);
+          patchMesh.material.opacity =
+            atm.basePatchOpacity * (patchMesh.userData.opacityFactor || 1) * roomDarkContrast * subtleShimmer;
+        });
+      }
+
+      // 4) Update Volumetric Sunbeam / God-Ray Shafts from Window to Floor Patch
+      const winZ = -5.44;
+      const floorY = 0.068;
+      const cosR = Math.cos(atm.patchRotY);
+      const sinR = Math.sin(atm.patchRotY);
+
+      windowSunbeamMeshes.forEach((beamMesh) => {
+        const def = beamMesh.userData.rayDef;
+        if (!def) return;
+        const posAttr = beamMesh.geometry.attributes.position;
+        const arr = posAttr.array;
+
+        const lx1 = def.bx1 * atm.patchScaleX;
+        const lz1 = def.bz1 * atm.patchScaleZ;
+        const lx2 = def.bx2 * atm.patchScaleX;
+        const lz2 = def.bz2 * atm.patchScaleZ;
+
+        const fx1 = atm.patchX + (lx1 * cosR - lz1 * sinR);
+        const fz1 = atm.patchZ + (lx1 * sinR + lz1 * cosR);
+        const fx2 = atm.patchX + (lx2 * cosR - lz2 * sinR);
+        const fz2 = atm.patchZ + (lx2 * sinR + lz2 * cosR);
+
+        // Triangle 1
+        arr[0] = def.tx1; arr[1] = def.ty1; arr[2] = winZ;
+        arr[3] = fx1;     arr[4] = floorY;  arr[5] = fz1;
+        arr[6] = fx2;     arr[7] = floorY;  arr[8] = fz2;
+        // Triangle 2
+        arr[9]  = def.tx1; arr[10] = def.ty1; arr[11] = winZ;
+        arr[12] = fx2;     arr[13] = floorY;  arr[14] = fz2;
+        arr[15] = def.tx2; arr[16] = def.ty2; arr[17] = winZ;
+
+        posAttr.needsUpdate = true;
+        beamMesh.material.color.setHex(atm.beamColorHex);
+        beamMesh.material.opacity = atm.baseBeamOpacity * def.op * roomDarkContrast * subtleShimmer;
+      });
+
+      // 5) Update Window Natural PointLight (blends naturally with both Lamp ON and Lamp OFF)
+      if (windowSunPointLight) {
+        windowSunPointLight.color.setHex(atm.beamColorHex);
+        windowSunPointLight.intensity = atm.lightIntensity * lerpNum(1.25, 0.85, lightBlend);
+        windowSunPointLight.position.set(atm.patchX * 0.6, 2.45, (winZ + atm.patchZ) * 0.5);
+      }
+
+      // 6) Update Floating Hover Label above the 3D Room Window
+      const winLabelEl = document.getElementById('room-window-label');
+      if (winLabelEl) {
+        const iconEl = document.getElementById('room-window-label-icon');
+        const titleEl = document.getElementById('room-window-label-title');
+        const subEl = document.getElementById('room-window-label-subtitle');
+
+        const titleText = `Jendela Kamar: ${atm.phaseName} - ${shortTime}`;
+        if (iconEl && iconEl.textContent !== atm.icon) iconEl.textContent = atm.icon;
+        if (titleEl && titleEl.textContent !== titleText) titleEl.textContent = titleText;
+        if (subEl && subEl.textContent !== atm.subtitle) subEl.textContent = atm.subtitle;
+
+        const winWorldPos = new THREE.Vector3(0, 4.65, -5.42);
+        winWorldPos.project(camera);
+        const wx = (winWorldPos.x * 0.5 + 0.5) * window.innerWidth;
+        const wy = (-(winWorldPos.y * 0.5) + 0.5) * window.innerHeight;
+        winLabelEl.style.left = `${wx}px`;
+        winLabelEl.style.top = `${wy}px`;
+        winLabelEl.classList.toggle('label-visible', hoveredObjectId === 'room_window' && !currentOpenModalZoneId);
+      }
+    }
+
+    function updateLiveWIBWallClock(elapsedTime = 0) {
       // Compute exact WIB (UTC+7 / Asia/Jakarta) time regardless of device local timezone
       const now = new Date();
       const wibMs = now.getTime() + 7 * 3600 * 1000;
@@ -2396,6 +2805,9 @@
         clockLabelEl.style.top = `${cy}px`;
         clockLabelEl.classList.toggle('label-visible', hoveredObjectId === 'wall_clock' && !currentOpenModalZoneId);
       }
+
+      // Sync 3D Room Window, Volumetric Sunbeams & Floor Patch with Real-Time WIB
+      updateRealTimeWIBWindow(wibDate, elapsedTime);
     }
 
     function triggerActiveZone() {
@@ -2518,13 +2930,6 @@
 
       playerNightFillLight.intensity = lerpNum(0.6, 0, t);
       playerNightFillLight.position.set(player.position.x, 3.2, player.position.z + 0.4);
-
-      // Window Glass: warm daylight -> moonlit blue
-      if (windowGlassMesh) {
-        windowGlassMesh.material.color.copy(LIGHT_COLORS.windowColorNight).lerp(LIGHT_COLORS.windowColorDay, t);
-        windowGlassMesh.material.emissive.copy(LIGHT_COLORS.windowEmissiveNight).lerp(LIGHT_COLORS.windowEmissiveDay, t);
-        windowGlassMesh.material.emissiveIntensity = lerpNum(0.55, 0.75, t);
-      }
 
       // Monitor Screen, Desk Lamp Shade & Whiteboard emissive glow (Hover-Glow compatible)
       _tmpGlowColor.copy(LIGHT_COLORS.screenNight).lerp(LIGHT_COLORS.screenDay, t);
